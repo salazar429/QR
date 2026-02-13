@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector de Códigos QR - VERSIÓN SIMPLE</title>
+    <title>Lector de Códigos QR - Cámara Corregida</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -24,7 +24,6 @@
             margin-bottom: 30px;
         }
         
-        /* BOTÓN GRANDE */
         .btn-camara {
             background: linear-gradient(145deg, #4CAF50, #45a049);
             color: white;
@@ -53,7 +52,6 @@
             font-size: 64px;
         }
         
-        /* VIDEO - TAMAÑO FIJO */
         #video-container {
             width: 100%;
             max-width: 500px;
@@ -72,7 +70,8 @@
             border-radius: 10px;
             border: 3px solid #4CAF50;
             background-color: #000;
-            transform: scaleX(-1); /* Espejo para que sea más natural */
+            /* ELIMINADO: transform: scaleX(-1); - Esto causaba el espejo */
+            display: block;
         }
         
         .escaneo-overlay {
@@ -86,6 +85,7 @@
             pointer-events: none;
             animation: pulse 1.5s infinite;
             box-shadow: 0 0 0 2px rgba(255,255,255,0.5) inset;
+            z-index: 10;
         }
         
         @keyframes pulse {
@@ -94,7 +94,6 @@
             100% { border-color: rgba(76, 175, 80, 0.8); }
         }
         
-        /* BOTONES */
         .btn {
             padding: 15px 25px;
             border: none;
@@ -111,6 +110,10 @@
             background-color: #2196F3;
         }
         
+        .btn-archivo:hover {
+            background-color: #1976D2;
+        }
+        
         .btn-detener {
             background-color: #f44336;
             display: none;
@@ -120,7 +123,10 @@
             display: inline-block;
         }
         
-        /* ESTADO */
+        .btn-detener:hover {
+            background-color: #d32f2f;
+        }
+        
         .estado {
             text-align: center;
             padding: 20px;
@@ -132,7 +138,6 @@
             font-size: 18px;
         }
         
-        /* RESULTADO */
         .resultado {
             margin-top: 30px;
             padding: 20px;
@@ -185,62 +190,51 @@
             100% { transform: rotate(360deg); }
         }
         
-        .debug {
-            background-color: #f0f0f0;
-            padding: 15px;
+        .orientacion-info {
+            background-color: #e3f2fd;
+            padding: 10px;
             border-radius: 5px;
-            font-size: 12px;
-            margin-top: 20px;
-            display: none;
-        }
-        
-        .debug.activo {
-            display: block;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #1976D2;
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📷 LECTOR QR - VERSIÓN SIMPLE</h1>
+        <h1>📷 LECTOR QR - CÁMARA CORREGIDA</h1>
         
-        <!-- BOTÓN PRINCIPAL - SOLO ESTE BOTÓN -->
         <button id="btnAbrirCamara" class="btn-camara">
             <span class="icono">📸</span>
             <span>ABRIR CÁMARA</span>
             <span style="font-size: 16px;">Haz clic aquí para activar la cámara</span>
         </button>
         
-        <!-- BOTONES SECUNDARIOS -->
         <div style="text-align: center;">
             <label for="fileInput" class="btn btn-archivo">📁 Escanear desde archivo</label>
             <input type="file" id="fileInput" accept="image/*">
             <button id="btnDetener" class="btn btn-detener">⏹️ Detener cámara</button>
         </div>
         
-        <!-- CONTENEDOR DEL VIDEO - DIRECTO, SIN LIBRERÍA -->
         <div id="video-container">
             <video id="video" playsinline autoplay></video>
             <div class="escaneo-overlay"></div>
             <div style="text-align: center; margin-top: 10px; color: #4CAF50; font-weight: bold;">
                 ⚡ Enfoca el código QR ⚡
             </div>
+            <div id="orientacionInfo" class="orientacion-info" style="display: none;">
+                📐 Usando cámara trasera - orientación normal
+            </div>
         </div>
         
-        <!-- ESTADO -->
         <div id="estado" class="estado">
             👆 Haz clic en "ABRIR CÁMARA" para comenzar
         </div>
         
-        <!-- RESULTADO -->
         <div id="resultado" class="resultado">
             <h2 style="color: #333; margin-bottom: 20px;">✅ Producto Escaneado</h2>
             <div id="productoInfo" class="producto-info"></div>
-        </div>
-        
-        <!-- INFORMACIÓN TÉCNICA -->
-        <div id="debug" class="debug">
-            <strong>🔧 Debug:</strong>
-            <div id="debugTexto"></div>
         </div>
     </div>
 
@@ -253,18 +247,12 @@
         let scanning = false;
         let stream = null;
         
-        // SOLUCIÓN SIMPLE Y DIRECTA
         document.getElementById('btnAbrirCamara').addEventListener('click', async function() {
             const btn = this;
             const estado = document.getElementById('estado');
             const videoContainer = document.getElementById('video-container');
-            const debugTexto = document.getElementById('debugTexto');
-            const debug = document.getElementById('debug');
+            const orientacionInfo = document.getElementById('orientacionInfo');
             
-            // Mostrar debug
-            debug.classList.add('activo');
-            
-            // Cambiar botón
             btn.disabled = true;
             btn.innerHTML = `
                 <span class="loading"></span>
@@ -272,98 +260,127 @@
             `;
             
             estado.innerHTML = '📸 Solicitando permiso de cámara...';
-            debugTexto.innerHTML = 'Solicitando getUserMedia...<br>';
             
             try {
-                // 1. PEDIR PERMISO Y OBTENER STREAM
+                // SOLUCIÓN 1: Especificar facingMode EXACT para cámara trasera
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
-                        facingMode: "environment",
+                        facingMode: { exact: "environment" }, // Cámara trasera EXACTA
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     } 
                 });
                 
-                debugTexto.innerHTML += '✅ Permiso concedido<br>';
-                debugTexto.innerHTML += '🎥 Stream obtenido<br>';
+                // SOLUCIÓN 2: Mostrar qué cámara se está usando
+                const videoTracks = stream.getVideoTracks();
+                if (videoTracks.length > 0) {
+                    const track = videoTracks[0];
+                    const settings = track.getSettings();
+                    console.log('Cámara:', track.label);
+                    console.log('Settings:', settings);
+                    
+                    orientacionInfo.style.display = 'block';
+                    orientacionInfo.innerHTML = `📐 Usando: ${track.label || 'Cámara trasera'}<br>Orientación normal - sin espejo`;
+                }
                 
-                // 2. ASIGNAR STREAM DIRECTAMENTE AL VIDEO
+                // SOLUCIÓN 3: Asignar stream SIN ninguna transformación
                 video.srcObject = stream;
                 
-                debugTexto.innerHTML += '📹 Video.srcObject asignado<br>';
-                
-                // 3. ESPERAR QUE EL VIDEO ESTÉ LISTO
                 video.onloadedmetadata = function() {
                     video.play();
-                    debugTexto.innerHTML += '▶️ Video.play() ejecutado<br>';
                     
-                    // 4. MOSTRAR CONTENEDOR DE VIDEO
+                    // SOLUCIÓN 4: Asegurar que no hay estilos que inviertan la imagen
+                    video.style.transform = 'none'; // Eliminar cualquier transformación
+                    video.style.transformOrigin = 'center';
+                    
                     videoContainer.style.display = 'block';
                     videoContainer.classList.add('activo');
                     
-                    // 5. CAMBIAR ESTADO
                     estado.innerHTML = '🔍 Escaneando... Apunta el código QR hacia la cámara';
                     
-                    // 6. OCULTAR BOTÓN DE ABRIR, MOSTRAR BOTÓN DE DETENER
                     btn.style.display = 'none';
                     document.getElementById('btnDetener').classList.add('activo');
                     
-                    // 7. INICIAR ESCANEO
                     scanning = true;
                     escanearQR();
                 };
                 
             } catch (err) {
                 console.error('Error:', err);
-                debugTexto.innerHTML += `❌ ERROR: ${err.name} - ${err.message}<br>`;
-                estado.innerHTML = `❌ Error: ${err.message}`;
                 
-                // Restaurar botón
-                btn.disabled = false;
-                btn.innerHTML = `
-                    <span class="icono">📸</span>
-                    <span>ABRIR CÁMARA</span>
-                    <span style="font-size: 16px;">Haz clic aquí para activar la cámara</span>
-                `;
+                // SOLUCIÓN 5: Si falla la cámara trasera exacta, intentar sin 'exact'
+                try {
+                    estado.innerHTML = '📸 Intentando con cualquier cámara...';
+                    
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: "environment", // Sin 'exact'
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+                    
+                    // Repetir el proceso de éxito
+                    const videoTracks = stream.getVideoTracks();
+                    if (videoTracks.length > 0) {
+                        const track = videoTracks[0];
+                        orientacionInfo.style.display = 'block';
+                        orientacionInfo.innerHTML = `📐 Usando: ${track.label || 'Cámara'}<br>Orientación normal`;
+                    }
+                    
+                    video.srcObject = stream;
+                    
+                    video.onloadedmetadata = function() {
+                        video.play();
+                        video.style.transform = 'none';
+                        videoContainer.style.display = 'block';
+                        videoContainer.classList.add('activo');
+                        estado.innerHTML = '🔍 Escaneando... Apunta el código QR hacia la cámara';
+                        btn.style.display = 'none';
+                        document.getElementById('btnDetener').classList.add('activo');
+                        scanning = true;
+                        escanearQR();
+                    };
+                    
+                } catch (secondErr) {
+                    // Si todo falla, mostrar error
+                    estado.innerHTML = `❌ Error: No se pudo acceder a la cámara trasera`;
+                    btn.disabled = false;
+                    btn.innerHTML = `
+                        <span class="icono">📸</span>
+                        <span>ABRIR CÁMARA</span>
+                        <span style="font-size: 16px;">Haz clic aquí para activar la cámara</span>
+                    `;
+                }
             }
         });
         
-        // FUNCIÓN DE ESCANEO
         function escanearQR() {
             if (!scanning) return;
             
             try {
                 if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    // Configurar canvas del tamaño del video
+                    // Usar las dimensiones REALES del video
                     canvasElement.height = video.videoHeight;
                     canvasElement.width = video.videoWidth;
                     
-                    // Dibujar frame del video en el canvas
+                    // Dibujar SIN invertir
                     canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
                     
-                    // Obtener datos de la imagen
                     let imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                    
-                    // Buscar QR
                     let code = jsQR(imageData.data, imageData.width, imageData.height, {
                         inversionAttempts: "dontInvert",
                     });
                     
                     if (code) {
-                        // ¡QR ENCONTRADO!
                         console.log('QR detectado:', code.data);
                         procesarResultado(code.data);
                         
-                        // Vibrar
                         if (navigator.vibrate) navigator.vibrate(200);
                         
-                        // Cambiar estado
                         document.getElementById('estado').innerHTML = '✅ ¡QR detectado!';
-                        
-                        // Detener escaneo
                         scanning = false;
                         
-                        // Opcional: detener cámara después de 2 segundos
                         setTimeout(() => {
                             detenerCamara();
                         }, 2000);
@@ -373,13 +390,11 @@
                 console.error('Error en escaneo:', e);
             }
             
-            // Continuar escaneando
             if (scanning) {
                 requestAnimationFrame(escanearQR);
             }
         }
         
-        // DETENER CÁMARA
         function detenerCamara() {
             if (stream) {
                 stream.getTracks().forEach(track => {
@@ -392,15 +407,14 @@
             document.getElementById('btnAbrirCamara').style.display = 'flex';
             document.getElementById('btnDetener').classList.remove('activo');
             document.getElementById('estado').innerHTML = '📸 Cámara detenida';
+            document.getElementById('orientacionInfo').style.display = 'none';
             
             scanning = false;
             stream = null;
         }
         
-        // EVENTO BOTÓN DETENER
         document.getElementById('btnDetener').addEventListener('click', detenerCamara);
         
-        // ESCANEAR DESDE ARCHIVO
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const archivo = e.target.files[0];
             if (archivo) {
@@ -430,12 +444,10 @@
             this.value = '';
         });
         
-        // PROCESAR RESULTADO
         function procesarResultado(texto) {
             const resultado = document.getElementById('resultado');
             const productoInfo = document.getElementById('productoInfo');
             
-            // Analizar texto
             let producto = "Producto desconocido";
             let precio = "0.00";
             let fecha = new Date().toLocaleDateString();
@@ -449,13 +461,11 @@
             const fechaMatch = texto.match(/Generado:\s*(.+?)(?:\n|$)/);
             if (fechaMatch) fecha = fechaMatch[1].trim();
             
-            // Formatear precio
             let precioMostrar = precio;
             if (!precioMostrar.includes('$') && !isNaN(precioMostrar)) {
                 precioMostrar = `$${parseFloat(precioMostrar).toFixed(2)}`;
             }
             
-            // Mostrar resultado
             productoInfo.innerHTML = `
                 <div class="producto-nombre">📦 ${producto}</div>
                 <div class="producto-precio">💰 ${precioMostrar}</div>
@@ -468,6 +478,13 @@
             
             resultado.classList.add('mostrar');
         }
+        
+        // Limpiar al cerrar
+        window.addEventListener('beforeunload', function() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
     </script>
 </body>
 </html>
