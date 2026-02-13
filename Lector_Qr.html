@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector de Códigos QR - Solicitud Directa</title>
+    <title>Lector de Códigos QR - Cámara Corregida</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -24,7 +24,6 @@
             margin-bottom: 30px;
         }
         
-        /* BOTÓN GRANDE Y LLAMATIVO PARA SOLICITAR CÁMARA */
         .btn-solicitar-camara {
             background: linear-gradient(145deg, #4CAF50, #45a049);
             color: white;
@@ -47,10 +46,6 @@
         .btn-solicitar-camara:hover {
             transform: scale(1.02);
             box-shadow: 0 15px 30px rgba(76, 175, 80, 0.4);
-        }
-        
-        .btn-solicitar-camara:active {
-            transform: scale(0.98);
         }
         
         .btn-solicitar-camara .icono {
@@ -83,14 +78,6 @@
             transition: all 0.3s;
         }
         
-        .btn-camara {
-            background-color: #4CAF50;
-        }
-        
-        .btn-camara:hover {
-            background-color: #45a049;
-        }
-        
         .btn-archivo {
             background-color: #2196F3;
         }
@@ -105,13 +92,6 @@
         
         .btn-detener:hover {
             background-color: #d32f2f;
-        }
-        
-        .btn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
         }
         
         .lector-container {
@@ -132,6 +112,7 @@
             border-radius: 10px;
             border: 3px solid #4CAF50;
             background-color: #000;
+            min-height: 300px;
         }
         
         .escaneo-overlay {
@@ -243,13 +224,22 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .debug-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📷 Lector de Códigos QR</h1>
         
-        <!-- Mensajes de estado -->
         <div id="errorMensaje" class="error-mensaje">
             ⚠️ <span id="errorTexto"></span>
         </div>
@@ -258,16 +248,15 @@
             ✅ <span id="exitoTexto"></span>
         </div>
         
-        <!-- BOTÓN PRINCIPAL: SOLICITAR CÁMARA (MUY VISIBLE) -->
-        <button id="btnSolicitarCamara" class="btn-solicitar-camara">
+        <!-- BOTÓN ÚNICO - SOLICITA PERMISO Y ABRE CÁMARA DIRECTAMENTE -->
+        <button id="btnAbrirCamara" class="btn-solicitar-camara">
             <span class="icono">📸</span>
-            <span>HACER CLIC PARA USAR CÁMARA</span>
-            <span class="texto-pequeno">El navegador te pedirá permiso aquí</span>
+            <span>HACER CLIC PARA ABRIR CÁMARA</span>
+            <span class="texto-pequeno">El navegador te pedirá permiso y la cámara se abrirá</span>
         </button>
         
-        <!-- Opciones secundarias -->
+        <!-- Opción de archivo -->
         <div class="opciones">
-            <button id="btnCamara" class="btn btn-camara" style="display: none;">📸 Activar Cámara</button>
             <label for="fileInput" class="btn btn-archivo">📁 Escanear desde Archivo</label>
             <input type="file" id="fileInput" accept="image/*">
             <button id="btnDetener" class="btn btn-detener" style="display: none;">⏹️ Detener Cámara</button>
@@ -281,7 +270,13 @@
         
         <!-- Estado actual -->
         <div id="estado" class="estado">
-            <span id="estadoTexto">👆 Haz clic en el botón grande para activar la cámara</span>
+            <span id="estadoTexto">👆 Haz clic en el botón verde para abrir la cámara</span>
+        </div>
+        
+        <!-- Información de depuración -->
+        <div id="debugInfo" class="debug-info">
+            <strong>🔧 Información técnica:</strong><br>
+            <span id="debugTexto"></span>
         </div>
         
         <!-- Resultado del escaneo -->
@@ -295,25 +290,33 @@
     <script>
         // Variables globales
         let html5QrCode = null;
-        let escaneoActivo = false;
         
-        // SOLUCIÓN: Un solo botón que SOLICITA PERMISO y ACTIVA CÁMARA
-        document.getElementById('btnSolicitarCamara').addEventListener('click', async function() {
+        // SOLUCIÓN: Un solo botón que PIDE PERMISO Y MANTIENE LA CÁMARA ACTIVA
+        document.getElementById('btnAbrirCamara').addEventListener('click', async function() {
             const btn = this;
             const estado = document.getElementById('estadoTexto');
+            const lectorContainer = document.getElementById('lectorContainer');
+            const debugTexto = document.getElementById('debugTexto');
+            const debugInfo = document.getElementById('debugInfo');
             
-            // Cambiar estado
+            // Mostrar info de depuración
+            debugInfo.style.display = 'block';
+            
+            // Cambiar estado del botón
             btn.disabled = true;
             btn.innerHTML = `
                 <span class="loading"></span>
-                <span>SOLICITANDO PERMISO...</span>
-                <span class="texto-pequeno">Esperando respuesta del navegador</span>
+                <span>ABRIENDO CÁMARA...</span>
+                <span class="texto-pequeno">Esto puede tomar unos segundos</span>
             `;
             
             estado.textContent = '🔍 Solicitando acceso a la cámara...';
+            debugTexto.innerHTML = 'Solicitando permisos...';
             
             try {
-                // INTENTAR ACCEDER A LA CÁMARA - ESTO ACTIVA EL PERMISO DEL NAVEGADOR
+                // PASO 1: SOLICITAR PERMISO Y OBTENER STREAM DE CÁMARA
+                debugTexto.innerHTML += '<br>📸 Solicitando getUserMedia...';
+                
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: {
                         facingMode: "environment",
@@ -322,103 +325,106 @@
                     } 
                 });
                 
-                // Detener el stream de prueba
-                stream.getTracks().forEach(track => track.stop());
+                debugTexto.innerHTML += '<br>✅ Permiso concedido, stream obtenido';
                 
-                // Mostrar mensaje de éxito
-                mostrarExito('✅ Permiso concedido. Ahora puedes usar la cámara.');
+                // PASO 2: VERIFICAR QUE EL STREAM TIENE VIDEO
+                const videoTracks = stream.getVideoTracks();
+                debugTexto.innerHTML += `<br>🎥 Track de video: ${videoTracks.length > 0 ? videoTracks[0].label : 'Ninguno'}`;
                 
-                // Ocultar botón grande
-                btn.style.display = 'none';
-                
-                // Mostrar botones de cámara
-                document.getElementById('btnCamara').style.display = 'block';
-                document.getElementById('btnDetener').style.display = 'block';
-                
-                // Iniciar cámara automáticamente
-                await iniciarCamara();
-                
-            } catch (err) {
-                console.error('Error al solicitar permiso:', err);
-                
-                // Restaurar botón
-                btn.disabled = false;
-                btn.innerHTML = `
-                    <span class="icono">📸</span>
-                    <span>HACER CLIC PARA USAR CÁMARA</span>
-                    <span class="texto-pequeno">El navegador te pedirá permiso aquí</span>
-                `;
-                
-                // Mostrar error específico
-                if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
-                    mostrarError('❌ Permiso denegado. Haz clic en el botón de nuevo y selecciona "Permitir" cuando el navegador lo solicite.');
-                } else if (err.name === 'NotFoundError') {
-                    mostrarError('❌ No se encontró ninguna cámara en este dispositivo.');
-                } else {
-                    mostrarError('❌ Error al acceder a la cámara: ' + err.message);
-                }
-                
-                estado.textContent = '❌ No se pudo acceder a la cámara. Intenta de nuevo.';
-            }
-        });
-
-        // Función para iniciar cámara con QR
-        async function iniciarCamara() {
-            const lectorContainer = document.getElementById('lectorContainer');
-            const estado = document.getElementById('estadoTexto');
-            const btnCamara = document.getElementById('btnCamara');
-            const btnDetener = document.getElementById('btnDetener');
-            
-            try {
-                // Detener cualquier instancia previa
+                // PASO 3: DETENER CUALQUIER INSTANCIA PREVIA DE QR
                 if (html5QrCode) {
-                    await html5QrCode.stop();
-                    await html5QrCode.clear();
+                    try {
+                        await html5QrCode.stop();
+                        await html5QrCode.clear();
+                    } catch (e) {
+                        console.log('Error al detener QR anterior:', e);
+                    }
                 }
-
-                html5QrCode = new Html5Qrcode("preview");
                 
+                // PASO 4: INICIALIZAR QR CON EL ELEMENTO VIDEO
+                html5QrCode = new Html5Qrcode("preview");
+                debugTexto.innerHTML += '<br>🔄 Inicializando Html5Qrcode...';
+                
+                // PASO 5: CONFIGURACIÓN DEL LECTOR
                 const config = {
                     fps: 10,
                     qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0
+                    aspectRatio: 1.0,
+                    videoConstraints: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
                 };
 
+                // PASO 6: INICIAR EL LECTOR CON EL STREAM QUE YA TENEMOS
+                // Usamos start() con el stream directamente
                 await html5QrCode.start(
-                    { facingMode: "environment" },
+                    stream,  // Pasamos el stream que ya tenemos
                     config,
                     onScanSuccess,
                     onScanError
                 );
                 
-                escaneoActivo = true;
+                debugTexto.innerHTML += '<br>✅ Lector QR iniciado correctamente';
+                
+                // PASO 7: MOSTRAR LA CÁMARA
                 lectorContainer.classList.add('activo');
+                btn.style.display = 'none';
+                document.getElementById('btnDetener').style.display = 'block';
                 estado.textContent = '🔍 Escaneando... Apunta el código QR hacia la cámara';
-                btnCamara.disabled = true;
-                btnDetener.disabled = false;
+                
+                // Mostrar éxito
+                mostrarExito('✅ Cámara activada correctamente');
                 
             } catch (err) {
-                console.error('Error al iniciar cámara:', err);
-                mostrarError('Error al iniciar la cámara: ' + err.message);
-            }
-        }
-
-        // Función para detener cámara
-        document.getElementById('btnDetener').addEventListener('click', async function() {
-            if (html5QrCode && escaneoActivo) {
-                await html5QrCode.stop();
-                await html5QrCode.clear();
+                console.error('Error completo:', err);
                 
-                document.getElementById('lectorContainer').classList.remove('activo');
-                document.getElementById('estadoTexto').textContent = '📸 Cámara detenida';
-                document.getElementById('btnCamara').disabled = false;
-                document.getElementById('btnDetener').disabled = true;
-                escaneoActivo = false;
+                // Restaurar botón
+                btn.disabled = false;
+                btn.innerHTML = `
+                    <span class="icono">📸</span>
+                    <span>HACER CLIC PARA ABRIR CÁMARA</span>
+                    <span class="texto-pequeno">El navegador te pedirá permiso y la cámara se abrirá</span>
+                `;
+                
+                debugTexto.innerHTML += `<br>❌ ERROR: ${err.name} - ${err.message}`;
+                
+                // Mostrar error específico
+                if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
+                    mostrarError('❌ Permiso denegado. Haz clic en el botón y selecciona "Permitir" cuando el navegador lo solicite.');
+                } else if (err.name === 'NotFoundError') {
+                    mostrarError('❌ No se encontró ninguna cámara en este dispositivo.');
+                } else if (err.name === 'NotReadableError') {
+                    mostrarError('❌ La cámara está siendo usada por otra aplicación. Ciérrala e intenta de nuevo.');
+                } else {
+                    mostrarError('❌ Error al acceder a la cámara: ' + err.message);
+                }
+                
+                estado.textContent = '❌ Error al abrir la cámara. Intenta de nuevo.';
             }
         });
 
-        // Botón para activar cámara manualmente (si ya hay permisos)
-        document.getElementById('btnCamara').addEventListener('click', iniciarCamara);
+        // Función para detener cámara
+        document.getElementById('btnDetener').addEventListener('click', async function() {
+            if (html5QrCode) {
+                try {
+                    await html5QrCode.stop();
+                    await html5QrCode.clear();
+                    
+                    document.getElementById('lectorContainer').classList.remove('activo');
+                    document.getElementById('estadoTexto').textContent = '📸 Cámara detenida';
+                    document.getElementById('btnAbrirCamara').style.display = 'flex';
+                    document.getElementById('btnDetener').style.display = 'none';
+                    
+                    // Limpiar debug
+                    document.getElementById('debugInfo').style.display = 'none';
+                    
+                } catch (err) {
+                    console.error('Error al detener:', err);
+                }
+            }
+        });
 
         // Escanear desde archivo
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -431,12 +437,14 @@
         function escanearDesdeArchivo(archivo) {
             document.getElementById('estadoTexto').textContent = '📁 Procesando imagen...';
             
-            const qrCode = new Html5Qrcode("preview");
+            // Crear instancia temporal para archivo
+            const qrCodeTemp = new Html5Qrcode("preview");
             
-            qrCode.scanFile(archivo, true)
+            qrCodeTemp.scanFile(archivo, true)
                 .then(decodedText => {
                     procesarResultado(decodedText);
                     document.getElementById('estadoTexto').textContent = '✅ QR escaneado exitosamente';
+                    mostrarExito('✅ Código QR leído correctamente');
                 })
                 .catch(err => {
                     console.error('Error al escanear archivo:', err);
@@ -449,22 +457,28 @@
         }
 
         function onScanSuccess(decodedText, decodedResult) {
+            // Vibrar
             if (navigator.vibrate) {
                 navigator.vibrate(200);
             }
             
+            // Procesar resultado
             procesarResultado(decodedText);
             document.getElementById('estadoTexto').textContent = '✅ ¡QR detectado!';
+            mostrarExito('✅ Producto escaneado correctamente');
             
-            // Detener la cámara automáticamente
+            // Opcional: detener automáticamente después de escanear
+            // Comenta esta línea si NO quieres que se detenga automáticamente
             setTimeout(() => {
                 document.getElementById('btnDetener').click();
-            }, 1500);
+            }, 2000);
         }
 
         function onScanError(errorMessage) {
-            // Solo mostrar en consola para no molestar
-            console.debug('Escaneando...');
+            // Solo mostrar errores en consola si son relevantes
+            if (errorMessage && !errorMessage.includes('NotFoundException')) {
+                console.debug('Error de escaneo:', errorMessage);
+            }
         }
 
         function procesarResultado(textoQR) {
@@ -513,8 +527,9 @@
                 <div class="producto-nombre">📦 ${info.producto}</div>
                 <div class="producto-precio">💰 ${precioMostrar}</div>
                 <div class="producto-fecha" style="color: #666;">📅 Fecha: ${info.fecha}</div>
-                <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
-                    <small>🔍 ${info.textoCompleto}</small>
+                <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px; word-break: break-all;">
+                    <small style="color: #666;">🔍 Texto completo:</small><br>
+                    <small>${info.textoCompleto}</small>
                 </div>
             `;
             
@@ -545,9 +560,13 @@
 
         // Limpiar al cerrar
         window.addEventListener('beforeunload', async function() {
-            if (html5QrCode && escaneoActivo) {
-                await html5QrCode.stop();
-                await html5QrCode.clear();
+            if (html5QrCode) {
+                try {
+                    await html5QrCode.stop();
+                    await html5QrCode.clear();
+                } catch (err) {
+                    console.error('Error al limpiar:', err);
+                }
             }
         });
     </script>
