@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Códigos QR para Productos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .qr-container {
+            margin-top: 30px;
+            text-align: center;
+            display: none;
+        }
+        .qr-container.show {
+            display: block;
+        }
+        .product-info {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        #qr-code {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .download-btn {
+            background-color: #2196F3;
+            margin-top: 10px;
+        }
+        .download-btn:hover {
+            background-color: #1976D2;
+        }
+        .error {
+            color: red;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Generador de Códigos QR para Productos</h1>
+        
+        <div class="form-group">
+            <label for="producto">Nombre del Producto:</label>
+            <input type="text" id="producto" placeholder="Ej: Laptop HP" autocomplete="off">
+        </div>
+        
+        <div class="form-group">
+            <label for="precio">Precio del Producto:</label>
+            <input type="number" id="precio" placeholder="Ej: 599.99" step="0.01" min="0">
+        </div>
+        
+        <button onclick="generarQR()">Generar Código QR</button>
+        
+        <div id="qr-container" class="qr-container">
+            <div class="product-info">
+                <h3 id="producto-mostrar"></h3>
+                <p id="precio-mostrar"></p>
+            </div>
+            <div id="qr-code"></div>
+            <button onclick="descargarQR()" class="download-btn">⬇️ Descargar QR</button>
+            <button onclick="limpiarFormulario()" style="background-color: #f44336; margin-top: 10px;">🗑️ Limpiar</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script>
+        let qrCode = null;
+
+        function generarQR() {
+            const producto = document.getElementById('producto').value.trim();
+            const precio = document.getElementById('precio').value.trim();
+
+            // Validar campos
+            if (!producto) {
+                alert('Por favor, ingresa el nombre del producto');
+                return;
+            }
+            if (!precio) {
+                alert('Por favor, ingresa el precio del producto');
+                return;
+            }
+
+            // Crear texto para el QR
+            const precioFormateado = parseFloat(precio).toFixed(2);
+            const textoQR = `Producto: ${producto}\nPrecio: $${precioFormateado}\nGenerado: ${new Date().toLocaleDateString()}`;
+
+            // Mostrar información del producto
+            document.getElementById('producto-mostrar').textContent = `Producto: ${producto}`;
+            document.getElementById('precio-mostrar').textContent = `Precio: $${precioFormateado}`;
+
+            // Limpiar QR anterior
+            document.getElementById('qr-code').innerHTML = '';
+
+            // Generar nuevo QR
+            qrCode = new QRCode(document.getElementById('qr-code'), {
+                text: textoQR,
+                width: 256,
+                height: 256,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            // Mostrar el contenedor del QR
+            document.getElementById('qr-container').classList.add('show');
+        }
+
+        function descargarQR() {
+            if (!qrCode) {
+                alert('Primero genera un código QR');
+                return;
+            }
+
+            // Obtener el canvas del QR
+            const canvas = document.querySelector('#qr-code canvas');
+            if (canvas) {
+                // Crear un enlace de descarga
+                const link = document.createElement('a');
+                link.download = `QR-${document.getElementById('producto').value.trim()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+
+        function limpiarFormulario() {
+            document.getElementById('producto').value = '';
+            document.getElementById('precio').value = '';
+            document.getElementById('qr-container').classList.remove('show');
+            document.getElementById('qr-code').innerHTML = '';
+            qrCode = null;
+        }
+
+        // Permitir generar QR con Enter
+        document.getElementById('precio').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generarQR();
+            }
+        });
+
+        document.getElementById('producto').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generarQR();
+            }
+        });
+
+        // Formatear precio mientras se escribe
+        document.getElementById('precio').addEventListener('input', function(e) {
+            let valor = e.target.value;
+            if (valor < 0) e.target.value = 0;
+        });
+    </script>
+</body>
+</html>

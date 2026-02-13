@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lector de Códigos QR para Productos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .opciones {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            min-width: 150px;
+        }
+        .btn-camara {
+            background-color: #4CAF50;
+        }
+        .btn-camara:hover {
+            background-color: #45a049;
+        }
+        .btn-archivo {
+            background-color: #2196F3;
+        }
+        .btn-archivo:hover {
+            background-color: #1976D2;
+        }
+        .btn-detener {
+            background-color: #f44336;
+        }
+        .btn-detener:hover {
+            background-color: #d32f2f;
+        }
+        .btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .lector-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 20px auto;
+            display: none;
+        }
+        .lector-container.activo {
+            display: block;
+        }
+        
+        #preview {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+            border: 3px solid #4CAF50;
+        }
+        
+        .escaneo-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid rgba(76, 175, 80, 0.5);
+            border-radius: 10px;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { border-color: rgba(76, 175, 80, 0.5); }
+            50% { border-color: rgba(76, 175, 80, 1); }
+            100% { border-color: rgba(76, 175, 80, 0.5); }
+        }
+        
+        .resultado-container {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e8f5e9;
+            border-radius: 10px;
+            display: none;
+        }
+        .resultado-container.mostrar {
+            display: block;
+        }
+        
+        .producto-info {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 5px solid #4CAF50;
+        }
+        
+        .producto-nombre {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .producto-precio {
+            font-size: 28px;
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .producto-fecha {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .historial {
+            margin-top: 30px;
+        }
+        
+        .historial-item {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 3px solid #2196F3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .estado {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📷 Lector de Códigos QR para Productos</h1>
+        
+        <div class="opciones">
+            <button id="btnCamara" class="btn btn-camara">📸 Activar Cámara</button>
+            <label for="fileInput" class="btn btn-archivo">📁 Escanear desde Archivo</label>
+            <input type="file" id="fileInput" accept="image/*">
+            <button id="btnDetener" class="btn btn-detener" disabled>⏹️ Detener Cámara</button>
+        </div>
+        
+        <div id="lectorContainer" class="lector-container">
+            <video id="preview" playsinline></video>
+            <div class="escaneo-overlay"></div>
+        </div>
+        
+        <div id="estado" class="estado">
+            Esperando para escanear un código QR...
+        </div>
+        
+        <div id="resultadoContainer" class="resultado-container">
+            <h2 style="color: #333; margin-bottom: 20px;">✅ Producto Escaneado</h2>
+            <div id="productoInfo" class="producto-info">
+                <!-- La información del producto se insertará aquí -->
+            </div>
+        </div>
+        
+        <div class="historial" id="historial">
+            <h2 style="color: #333; margin-bottom: 20px;">📋 Historial de Escaneos</h2>
+            <div id="historialLista"></div>
+            <button id="btnLimpiarHistorial" class="btn" style="background-color: #ff9800; margin-top: 10px;" onclick="limpiarHistorial()">🗑️ Limpiar Historial</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script>
+        // Variables globales
+        let html5QrCode = null;
+        let escaneoActivo = false;
+        let historialEscaneos = JSON.parse(localStorage.getItem('historialQR')) || [];
+
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            mostrarHistorial();
+        });
+
+        // Escanear con cámara
+        document.getElementById('btnCamara').addEventListener('click', function() {
+            iniciarCamara();
+        });
+
+        // Detener cámara
+        document.getElementById('btnDetener').addEventListener('click', function() {
+            detenerCamara();
+        });
+
+        // Escanear desde archivo
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const archivo = e.target.files[0];
+            if (archivo) {
+                escanearDesdeArchivo(archivo);
+            }
+        });
+
+        function iniciarCamara() {
+            const lectorContainer = document.getElementById('lectorContainer');
+            const estado = document.getElementById('estado');
+            const btnCamara = document.getElementById('btnCamara');
+            const btnDetener = document.getElementById('btnDetener');
+            
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                }).catch(err => {
+                    console.log('Error al detener:', err);
+                });
+            }
+
+            html5QrCode = new Html5Qrcode("preview");
+            
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess,
+                onScanError
+            ).then(() => {
+                escaneoActivo = true;
+                lectorContainer.classList.add('activo');
+                estado.innerHTML = '🔍 Escaneando... Apunta el código QR hacia la cámara';
+                btnCamara.disabled = true;
+                btnDetener.disabled = false;
+            }).catch(err => {
+                console.log('Error al iniciar cámara:', err);
+                estado.innerHTML = '❌ No se pudo acceder a la cámara. Asegúrate de dar permisos.';
+            });
+        }
+
+        function detenerCamara() {
+            if (html5QrCode && escaneoActivo) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    document.getElementById('lectorContainer').classList.remove('activo');
+                    document.getElementById('estado').innerHTML = '📸 Cámara detenida';
+                    document.getElementById('btnCamara').disabled = false;
+                    document.getElementById('btnDetener').disabled = true;
+                    escaneoActivo = false;
+                }).catch(err => {
+                    console.log('Error al detener:', err);
+                });
+            }
+        }
+
+        function escanearDesdeArchivo(archivo) {
+            const estado = document.getElementById('estado');
+            estado.innerHTML = '📁 Procesando imagen...';
+            
+            const qrCode = new Html5Qrcode("preview");
+            
+            qrCode.scanFile(archivo, true)
+                .then(decodedText => {
+                    procesarResultado(decodedText);
+                    estado.innerHTML = '✅ QR escaneado exitosamente desde archivo';
+                })
+                .catch(err => {
+                    console.log('Error al escanear archivo:', err);
+                    estado.innerHTML = '❌ No se pudo leer el código QR. Asegúrate de que sea válido.';
+                });
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // Vibrar si el dispositivo lo soporta
+            if (navigator.vibrate) {
+                navigator.vibrate(200);
+            }
+            
+            procesarResultado(decodedText);
+            
+            // Detener la cámara automáticamente después de un escaneo exitoso
+            setTimeout(() => {
+                detenerCamara();
+            }, 2000);
+        }
+
+        function onScanError(errorMessage) {
+            // Solo mostrar errores importantes
+            if (errorMessage.includes('NotFound')) {
+                console.log('No se detecta código QR');
+            }
+        }
+
+        function procesarResultado(textoQR) {
+            // Analizar el texto del QR
+            const info = analizarTextoQR(textoQR);
+            
+            // Mostrar resultado
+            mostrarResultado(info);
+            
+            // Guardar en historial
+            guardarEnHistorial(info);
+            
+            // Mostrar historial actualizado
+            mostrarHistorial();
+        }
+
+        function analizarTextoQR(texto) {
+            // Intentar extraer información del formato específico del generador
+            let producto = "Producto desconocido";
+            let precio = "0.00";
+            let fecha = new Date().toLocaleDateString();
+            
+            // Buscar el formato: "Producto: XXXX"
+            const productoMatch = texto.match(/Producto:\s*(.+?)(?:\n|$)/);
+            if (productoMatch) {
+                producto = productoMatch[1].trim();
+            }
+            
+            // Buscar el formato: "Precio: $XXX"
+            const precioMatch = texto.match(/Precio:\s*\$?([0-9,.]+)/);
+            if (precioMatch) {
+                precio = precioMatch[1].trim();
+            }
+            
+            // Buscar el formato: "Generado: XXXX"
+            const fechaMatch = texto.match(/Generado:\s*(.+?)(?:\n|$)/);
+            if (fechaMatch) {
+                fecha = fechaMatch[1].trim();
+            }
+            
+            return {
+                producto: producto,
+                precio: precio,
+                fecha: fecha,
+                textoCompleto: texto,
+                timestamp: new Date().getTime()
+            };
+        }
+
+        function mostrarResultado(info) {
+            const resultadoContainer = document.getElementById('resultadoContainer');
+            const productoInfo = document.getElementById('productoInfo');
+            
+            // Formatear precio con símbolo de dólar si no lo tiene
+            let precioMostrar = info.precio;
+            if (!precioMostrar.includes('$')) {
+                precioMostrar = `$${precioMostrar}`;
+            }
+            
+            productoInfo.innerHTML = `
+                <div class="producto-nombre">${info.producto}</div>
+                <div class="producto-precio">${precioMostrar}</div>
+                <div class="producto-fecha">📅 Fecha: ${info.fecha}</div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+                    <small style="color: #666;">🔍 Texto completo del QR:</small>
+                    <p style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 5px; font-size: 12px;">
+                        ${info.textoCompleto}
+                    </p>
+                </div>
+            `;
+            
+            resultadoContainer.classList.add('mostrar');
+        }
+
+        function guardarEnHistorial(info) {
+            // Agregar al inicio del array
+            historialEscaneos.unshift(info);
+            
+            // Limitar a 10 elementos
+            if (historialEscaneos.length > 10) {
+                historialEscaneos = historialEscaneos.slice(0, 10);
+            }
+            
+            // Guardar en localStorage
+            localStorage.setItem('historialQR', JSON.stringify(historialEscaneos));
+        }
+
+        function mostrarHistorial() {
+            const historialLista = document.getElementById('historialLista');
+            
+            if (historialEscaneos.length === 0) {
+                historialLista.innerHTML = '<div class="estado">No hay escaneos en el historial</div>';
+                return;
+            }
+            
+            let html = '';
+            historialEscaneos.forEach((item, index) => {
+                html += `
+                    <div class="historial-item">
+                        <div style="flex: 1;">
+                            <strong>${item.producto}</strong><br>
+                            <span style="color: #4CAF50;">$${item.precio}</span><br>
+                            <small style="color: #666;">${item.fecha}</small>
+                        </div>
+                        <button onclick="cargarDelHistorial(${index})" style="background: #2196F3; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;">
+                            Ver
+                        </button>
+                    </div>
+                `;
+            });
+            
+            historialLista.innerHTML = html;
+        }
+
+        function cargarDelHistorial(index) {
+            const info = historialEscaneos[index];
+            mostrarResultado(info);
+            
+            // Scroll suave hacia el resultado
+            document.getElementById('resultadoContainer').scrollIntoView({ 
+                behavior: 'smooth' 
+            });
+        }
+
+        function limpiarHistorial() {
+            if (confirm('¿Estás seguro de que quieres limpiar todo el historial?')) {
+                historialEscaneos = [];
+                localStorage.removeItem('historialQR');
+                mostrarHistorial();
+                document.getElementById('resultadoContainer').classList.remove('mostrar');
+            }
+        }
+
+        // Limpiar al cerrar la página
+        window.addEventListener('beforeunload', function() {
+            if (html5QrCode && escaneoActivo) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                }).catch(err => {
+                    console.log('Error al limpiar:', err);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
