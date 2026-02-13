@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector de Códigos QR para Productos</title>
+    <title>Lector de Códigos QR - Solicitud Directa</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,44 +23,95 @@
             text-align: center;
             margin-bottom: 30px;
         }
+        
+        /* BOTÓN GRANDE Y LLAMATIVO PARA SOLICITAR CÁMARA */
+        .btn-solicitar-camara {
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+            color: white;
+            font-size: 24px;
+            padding: 30px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            width: 100%;
+            margin: 20px 0;
+            font-weight: bold;
+            box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .btn-solicitar-camara:hover {
+            transform: scale(1.02);
+            box-shadow: 0 15px 30px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn-solicitar-camara:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-solicitar-camara .icono {
+            font-size: 48px;
+        }
+        
+        .btn-solicitar-camara .texto-pequeno {
+            font-size: 16px;
+            font-weight: normal;
+            opacity: 0.9;
+        }
+        
         .opciones {
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
+        
         .btn {
             flex: 1;
-            padding: 12px;
+            padding: 15px;
             border: none;
-            border-radius: 5px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 16px;
             font-weight: bold;
             color: white;
             min-width: 150px;
+            transition: all 0.3s;
         }
+        
         .btn-camara {
             background-color: #4CAF50;
         }
+        
         .btn-camara:hover {
             background-color: #45a049;
         }
+        
         .btn-archivo {
             background-color: #2196F3;
         }
+        
         .btn-archivo:hover {
             background-color: #1976D2;
         }
+        
         .btn-detener {
             background-color: #f44336;
         }
+        
         .btn-detener:hover {
             background-color: #d32f2f;
         }
+        
         .btn:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         
         .lector-container {
@@ -70,6 +121,7 @@
             margin: 20px auto;
             display: none;
         }
+        
         .lector-container.activo {
             display: block;
         }
@@ -79,6 +131,7 @@
             height: auto;
             border-radius: 10px;
             border: 3px solid #4CAF50;
+            background-color: #000;
         }
         
         .escaneo-overlay {
@@ -106,6 +159,7 @@
             border-radius: 10px;
             display: none;
         }
+        
         .resultado-container.mostrar {
             display: block;
         }
@@ -131,69 +185,109 @@
             font-weight: bold;
         }
         
-        .producto-fecha {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .historial {
-            margin-top: 30px;
-        }
-        
-        .historial-item {
-            background-color: white;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            border-left: 3px solid #2196F3;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
         .estado {
             text-align: center;
             padding: 20px;
             color: #666;
             font-style: italic;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #2196F3;
+        }
+        
+        .error-mensaje {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #c62828;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .error-mensaje.mostrar {
+            display: block;
+        }
+        
+        .exito-mensaje {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #2e7d32;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .exito-mensaje.mostrar {
+            display: block;
         }
         
         input[type="file"] {
             display: none;
         }
+        
+        .loading {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📷 Lector de Códigos QR para Productos</h1>
+        <h1>📷 Lector de Códigos QR</h1>
         
-        <div class="opciones">
-            <button id="btnCamara" class="btn btn-camara">📸 Activar Cámara</button>
-            <label for="fileInput" class="btn btn-archivo">📁 Escanear desde Archivo</label>
-            <input type="file" id="fileInput" accept="image/*">
-            <button id="btnDetener" class="btn btn-detener" disabled>⏹️ Detener Cámara</button>
+        <!-- Mensajes de estado -->
+        <div id="errorMensaje" class="error-mensaje">
+            ⚠️ <span id="errorTexto"></span>
         </div>
         
+        <div id="exitoMensaje" class="exito-mensaje">
+            ✅ <span id="exitoTexto"></span>
+        </div>
+        
+        <!-- BOTÓN PRINCIPAL: SOLICITAR CÁMARA (MUY VISIBLE) -->
+        <button id="btnSolicitarCamara" class="btn-solicitar-camara">
+            <span class="icono">📸</span>
+            <span>HACER CLIC PARA USAR CÁMARA</span>
+            <span class="texto-pequeno">El navegador te pedirá permiso aquí</span>
+        </button>
+        
+        <!-- Opciones secundarias -->
+        <div class="opciones">
+            <button id="btnCamara" class="btn btn-camara" style="display: none;">📸 Activar Cámara</button>
+            <label for="fileInput" class="btn btn-archivo">📁 Escanear desde Archivo</label>
+            <input type="file" id="fileInput" accept="image/*">
+            <button id="btnDetener" class="btn btn-detener" style="display: none;">⏹️ Detener Cámara</button>
+        </div>
+        
+        <!-- Contenedor de la cámara -->
         <div id="lectorContainer" class="lector-container">
             <video id="preview" playsinline></video>
             <div class="escaneo-overlay"></div>
         </div>
         
+        <!-- Estado actual -->
         <div id="estado" class="estado">
-            Esperando para escanear un código QR...
+            <span id="estadoTexto">👆 Haz clic en el botón grande para activar la cámara</span>
         </div>
         
+        <!-- Resultado del escaneo -->
         <div id="resultadoContainer" class="resultado-container">
             <h2 style="color: #333; margin-bottom: 20px;">✅ Producto Escaneado</h2>
-            <div id="productoInfo" class="producto-info">
-                <!-- La información del producto se insertará aquí -->
-            </div>
-        </div>
-        
-        <div class="historial" id="historial">
-            <h2 style="color: #333; margin-bottom: 20px;">📋 Historial de Escaneos</h2>
-            <div id="historialLista"></div>
-            <button id="btnLimpiarHistorial" class="btn" style="background-color: #ff9800; margin-top: 10px;" onclick="limpiarHistorial()">🗑️ Limpiar Historial</button>
+            <div id="productoInfo" class="producto-info"></div>
         </div>
     </div>
 
@@ -202,22 +296,129 @@
         // Variables globales
         let html5QrCode = null;
         let escaneoActivo = false;
-        let historialEscaneos = JSON.parse(localStorage.getItem('historialQR')) || [];
-
-        // Inicializar al cargar la página
-        document.addEventListener('DOMContentLoaded', function() {
-            mostrarHistorial();
+        
+        // SOLUCIÓN: Un solo botón que SOLICITA PERMISO y ACTIVA CÁMARA
+        document.getElementById('btnSolicitarCamara').addEventListener('click', async function() {
+            const btn = this;
+            const estado = document.getElementById('estadoTexto');
+            
+            // Cambiar estado
+            btn.disabled = true;
+            btn.innerHTML = `
+                <span class="loading"></span>
+                <span>SOLICITANDO PERMISO...</span>
+                <span class="texto-pequeno">Esperando respuesta del navegador</span>
+            `;
+            
+            estado.textContent = '🔍 Solicitando acceso a la cámara...';
+            
+            try {
+                // INTENTAR ACCEDER A LA CÁMARA - ESTO ACTIVA EL PERMISO DEL NAVEGADOR
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
+                // Detener el stream de prueba
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Mostrar mensaje de éxito
+                mostrarExito('✅ Permiso concedido. Ahora puedes usar la cámara.');
+                
+                // Ocultar botón grande
+                btn.style.display = 'none';
+                
+                // Mostrar botones de cámara
+                document.getElementById('btnCamara').style.display = 'block';
+                document.getElementById('btnDetener').style.display = 'block';
+                
+                // Iniciar cámara automáticamente
+                await iniciarCamara();
+                
+            } catch (err) {
+                console.error('Error al solicitar permiso:', err);
+                
+                // Restaurar botón
+                btn.disabled = false;
+                btn.innerHTML = `
+                    <span class="icono">📸</span>
+                    <span>HACER CLIC PARA USAR CÁMARA</span>
+                    <span class="texto-pequeno">El navegador te pedirá permiso aquí</span>
+                `;
+                
+                // Mostrar error específico
+                if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
+                    mostrarError('❌ Permiso denegado. Haz clic en el botón de nuevo y selecciona "Permitir" cuando el navegador lo solicite.');
+                } else if (err.name === 'NotFoundError') {
+                    mostrarError('❌ No se encontró ninguna cámara en este dispositivo.');
+                } else {
+                    mostrarError('❌ Error al acceder a la cámara: ' + err.message);
+                }
+                
+                estado.textContent = '❌ No se pudo acceder a la cámara. Intenta de nuevo.';
+            }
         });
 
-        // Escanear con cámara
-        document.getElementById('btnCamara').addEventListener('click', function() {
-            iniciarCamara();
+        // Función para iniciar cámara con QR
+        async function iniciarCamara() {
+            const lectorContainer = document.getElementById('lectorContainer');
+            const estado = document.getElementById('estadoTexto');
+            const btnCamara = document.getElementById('btnCamara');
+            const btnDetener = document.getElementById('btnDetener');
+            
+            try {
+                // Detener cualquier instancia previa
+                if (html5QrCode) {
+                    await html5QrCode.stop();
+                    await html5QrCode.clear();
+                }
+
+                html5QrCode = new Html5Qrcode("preview");
+                
+                const config = {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                };
+
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    onScanSuccess,
+                    onScanError
+                );
+                
+                escaneoActivo = true;
+                lectorContainer.classList.add('activo');
+                estado.textContent = '🔍 Escaneando... Apunta el código QR hacia la cámara';
+                btnCamara.disabled = true;
+                btnDetener.disabled = false;
+                
+            } catch (err) {
+                console.error('Error al iniciar cámara:', err);
+                mostrarError('Error al iniciar la cámara: ' + err.message);
+            }
+        }
+
+        // Función para detener cámara
+        document.getElementById('btnDetener').addEventListener('click', async function() {
+            if (html5QrCode && escaneoActivo) {
+                await html5QrCode.stop();
+                await html5QrCode.clear();
+                
+                document.getElementById('lectorContainer').classList.remove('activo');
+                document.getElementById('estadoTexto').textContent = '📸 Cámara detenida';
+                document.getElementById('btnCamara').disabled = false;
+                document.getElementById('btnDetener').disabled = true;
+                escaneoActivo = false;
+            }
         });
 
-        // Detener cámara
-        document.getElementById('btnDetener').addEventListener('click', function() {
-            detenerCamara();
-        });
+        // Botón para activar cámara manualmente (si ya hay permisos)
+        document.getElementById('btnCamara').addEventListener('click', iniciarCamara);
 
         // Escanear desde archivo
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -227,131 +428,65 @@
             }
         });
 
-        function iniciarCamara() {
-            const lectorContainer = document.getElementById('lectorContainer');
-            const estado = document.getElementById('estado');
-            const btnCamara = document.getElementById('btnCamara');
-            const btnDetener = document.getElementById('btnDetener');
-            
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    html5QrCode.clear();
-                }).catch(err => {
-                    console.log('Error al detener:', err);
-                });
-            }
-
-            html5QrCode = new Html5Qrcode("preview");
-            
-            const config = {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
-            };
-
-            html5QrCode.start(
-                { facingMode: "environment" },
-                config,
-                onScanSuccess,
-                onScanError
-            ).then(() => {
-                escaneoActivo = true;
-                lectorContainer.classList.add('activo');
-                estado.innerHTML = '🔍 Escaneando... Apunta el código QR hacia la cámara';
-                btnCamara.disabled = true;
-                btnDetener.disabled = false;
-            }).catch(err => {
-                console.log('Error al iniciar cámara:', err);
-                estado.innerHTML = '❌ No se pudo acceder a la cámara. Asegúrate de dar permisos.';
-            });
-        }
-
-        function detenerCamara() {
-            if (html5QrCode && escaneoActivo) {
-                html5QrCode.stop().then(() => {
-                    html5QrCode.clear();
-                    document.getElementById('lectorContainer').classList.remove('activo');
-                    document.getElementById('estado').innerHTML = '📸 Cámara detenida';
-                    document.getElementById('btnCamara').disabled = false;
-                    document.getElementById('btnDetener').disabled = true;
-                    escaneoActivo = false;
-                }).catch(err => {
-                    console.log('Error al detener:', err);
-                });
-            }
-        }
-
         function escanearDesdeArchivo(archivo) {
-            const estado = document.getElementById('estado');
-            estado.innerHTML = '📁 Procesando imagen...';
+            document.getElementById('estadoTexto').textContent = '📁 Procesando imagen...';
             
             const qrCode = new Html5Qrcode("preview");
             
             qrCode.scanFile(archivo, true)
                 .then(decodedText => {
                     procesarResultado(decodedText);
-                    estado.innerHTML = '✅ QR escaneado exitosamente desde archivo';
+                    document.getElementById('estadoTexto').textContent = '✅ QR escaneado exitosamente';
                 })
                 .catch(err => {
-                    console.log('Error al escanear archivo:', err);
-                    estado.innerHTML = '❌ No se pudo leer el código QR. Asegúrate de que sea válido.';
+                    console.error('Error al escanear archivo:', err);
+                    document.getElementById('estadoTexto').textContent = '❌ No se pudo leer el código QR';
+                    mostrarError('El archivo no contiene un código QR válido');
+                })
+                .finally(() => {
+                    document.getElementById('fileInput').value = '';
                 });
         }
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Vibrar si el dispositivo lo soporta
             if (navigator.vibrate) {
                 navigator.vibrate(200);
             }
             
             procesarResultado(decodedText);
+            document.getElementById('estadoTexto').textContent = '✅ ¡QR detectado!';
             
-            // Detener la cámara automáticamente después de un escaneo exitoso
+            // Detener la cámara automáticamente
             setTimeout(() => {
-                detenerCamara();
-            }, 2000);
+                document.getElementById('btnDetener').click();
+            }, 1500);
         }
 
         function onScanError(errorMessage) {
-            // Solo mostrar errores importantes
-            if (errorMessage.includes('NotFound')) {
-                console.log('No se detecta código QR');
-            }
+            // Solo mostrar en consola para no molestar
+            console.debug('Escaneando...');
         }
 
         function procesarResultado(textoQR) {
-            // Analizar el texto del QR
             const info = analizarTextoQR(textoQR);
-            
-            // Mostrar resultado
             mostrarResultado(info);
-            
-            // Guardar en historial
-            guardarEnHistorial(info);
-            
-            // Mostrar historial actualizado
-            mostrarHistorial();
         }
 
         function analizarTextoQR(texto) {
-            // Intentar extraer información del formato específico del generador
             let producto = "Producto desconocido";
             let precio = "0.00";
             let fecha = new Date().toLocaleDateString();
             
-            // Buscar el formato: "Producto: XXXX"
             const productoMatch = texto.match(/Producto:\s*(.+?)(?:\n|$)/);
             if (productoMatch) {
                 producto = productoMatch[1].trim();
             }
             
-            // Buscar el formato: "Precio: $XXX"
             const precioMatch = texto.match(/Precio:\s*\$?([0-9,.]+)/);
             if (precioMatch) {
                 precio = precioMatch[1].trim();
             }
             
-            // Buscar el formato: "Generado: XXXX"
             const fechaMatch = texto.match(/Generado:\s*(.+?)(?:\n|$)/);
             if (fechaMatch) {
                 fecha = fechaMatch[1].trim();
@@ -361,8 +496,7 @@
                 producto: producto,
                 precio: precio,
                 fecha: fecha,
-                textoCompleto: texto,
-                timestamp: new Date().getTime()
+                textoCompleto: texto
             };
         }
 
@@ -370,94 +504,50 @@
             const resultadoContainer = document.getElementById('resultadoContainer');
             const productoInfo = document.getElementById('productoInfo');
             
-            // Formatear precio con símbolo de dólar si no lo tiene
             let precioMostrar = info.precio;
-            if (!precioMostrar.includes('$')) {
-                precioMostrar = `$${precioMostrar}`;
+            if (!precioMostrar.includes('$') && !isNaN(precioMostrar)) {
+                precioMostrar = `$${parseFloat(precioMostrar).toFixed(2)}`;
             }
             
             productoInfo.innerHTML = `
-                <div class="producto-nombre">${info.producto}</div>
-                <div class="producto-precio">${precioMostrar}</div>
-                <div class="producto-fecha">📅 Fecha: ${info.fecha}</div>
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
-                    <small style="color: #666;">🔍 Texto completo del QR:</small>
-                    <p style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 5px; font-size: 12px;">
-                        ${info.textoCompleto}
-                    </p>
+                <div class="producto-nombre">📦 ${info.producto}</div>
+                <div class="producto-precio">💰 ${precioMostrar}</div>
+                <div class="producto-fecha" style="color: #666;">📅 Fecha: ${info.fecha}</div>
+                <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+                    <small>🔍 ${info.textoCompleto}</small>
                 </div>
             `;
             
             resultadoContainer.classList.add('mostrar');
         }
 
-        function guardarEnHistorial(info) {
-            // Agregar al inicio del array
-            historialEscaneos.unshift(info);
+        function mostrarError(mensaje) {
+            const errorContainer = document.getElementById('errorMensaje');
+            const errorTexto = document.getElementById('errorTexto');
+            errorTexto.textContent = mensaje;
+            errorContainer.classList.add('mostrar');
             
-            // Limitar a 10 elementos
-            if (historialEscaneos.length > 10) {
-                historialEscaneos = historialEscaneos.slice(0, 10);
-            }
-            
-            // Guardar en localStorage
-            localStorage.setItem('historialQR', JSON.stringify(historialEscaneos));
+            setTimeout(() => {
+                errorContainer.classList.remove('mostrar');
+            }, 5000);
         }
 
-        function mostrarHistorial() {
-            const historialLista = document.getElementById('historialLista');
+        function mostrarExito(mensaje) {
+            const exitoContainer = document.getElementById('exitoMensaje');
+            const exitoTexto = document.getElementById('exitoTexto');
+            exitoTexto.textContent = mensaje;
+            exitoContainer.classList.add('mostrar');
             
-            if (historialEscaneos.length === 0) {
-                historialLista.innerHTML = '<div class="estado">No hay escaneos en el historial</div>';
-                return;
-            }
-            
-            let html = '';
-            historialEscaneos.forEach((item, index) => {
-                html += `
-                    <div class="historial-item">
-                        <div style="flex: 1;">
-                            <strong>${item.producto}</strong><br>
-                            <span style="color: #4CAF50;">$${item.precio}</span><br>
-                            <small style="color: #666;">${item.fecha}</small>
-                        </div>
-                        <button onclick="cargarDelHistorial(${index})" style="background: #2196F3; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;">
-                            Ver
-                        </button>
-                    </div>
-                `;
-            });
-            
-            historialLista.innerHTML = html;
+            setTimeout(() => {
+                exitoContainer.classList.remove('mostrar');
+            }, 3000);
         }
 
-        function cargarDelHistorial(index) {
-            const info = historialEscaneos[index];
-            mostrarResultado(info);
-            
-            // Scroll suave hacia el resultado
-            document.getElementById('resultadoContainer').scrollIntoView({ 
-                behavior: 'smooth' 
-            });
-        }
-
-        function limpiarHistorial() {
-            if (confirm('¿Estás seguro de que quieres limpiar todo el historial?')) {
-                historialEscaneos = [];
-                localStorage.removeItem('historialQR');
-                mostrarHistorial();
-                document.getElementById('resultadoContainer').classList.remove('mostrar');
-            }
-        }
-
-        // Limpiar al cerrar la página
-        window.addEventListener('beforeunload', function() {
+        // Limpiar al cerrar
+        window.addEventListener('beforeunload', async function() {
             if (html5QrCode && escaneoActivo) {
-                html5QrCode.stop().then(() => {
-                    html5QrCode.clear();
-                }).catch(err => {
-                    console.log('Error al limpiar:', err);
-                });
+                await html5QrCode.stop();
+                await html5QrCode.clear();
             }
         });
     </script>
